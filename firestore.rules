@@ -1,0 +1,219 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email == 'mohammadullahmahmudi1@gmail.com');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isNotBlocked() {
+      return isSignedIn() && (
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'active') != 'blocked'
+      );
+    }
+
+    function isAdmin() {
+      // User from email or metadata is also an admin
+      return isSignedIn() && (
+        request.auth.token.email == 'mohammadullahmahmudi1@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isRole(role) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data) {
+      return (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() < 200)) &&
+             (!('email' in data) || (data.email is string && data.email.size() > 0 && data.email.size() < 200)) &&
+             (!('photo' in data) || (data.photo is string && data.photo.size() < 2000)) &&
+             (!('role' in data) || (data.role in ['user', 'admin']));
+    }
+
+    function isValidChat(data) {
+      return (!('userId' in data) || (data.userId is string && (data.userId == request.auth.uid || isAdmin()))) &&
+             (!('lastMessage' in data) || (data.lastMessage is string && data.lastMessage.size() < 2000));
+    }
+
+    function isValidMessage(data) {
+      return (!('sender' in data) || (data.sender in ['user', 'AI', 'admin'])) &&
+             (!('text' in data) || (data.text is string && data.text.size() < 20000)) &&
+             (!('type' in data) || (data.type in ['chat', 'ad', 'system', 'support']));
+    }
+
+    function isValidAd(data) {
+      return (!('image' in data) || (data.image is string && data.image.size() < 2000)) &&
+             (!('link' in data) || (data.link is string && data.link.size() < 2000)) &&
+             (!('title' in data) || (data.title is string && data.title.size() < 500)) &&
+             (!('active' in data) || (data.active is bool)) &&
+             (!('allowedRoles' in data) || (data.allowedRoles is list));
+    }
+
+    function isValidAbout(data) {
+      return (!('mission' in data) || (data.mission is string && data.mission.size() < 10000)) &&
+             (!('features' in data) || (data.features is string && data.features.size() < 10000));
+    }
+
+    function isValidFeedback(data) {
+      return (!('message' in data) || (data.message is string && data.message.size() > 0 && data.message.size() < 5000)) &&
+             (!('name' in data) || (data.name is string && data.name.size() < 200)) &&
+             (!('email' in data) || (data.email is string && data.email.size() < 200)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() < 50)) &&
+             (!('userId' in data) || (data.userId is string));
+    }
+
+    function isValidSupport(data) {
+      return (!('whatsapp' in data) || (data.whatsapp is string)) &&
+             (!('email' in data) || (data.email is string)) &&
+             (!('facebook' in data) || (data.facebook is string));
+    }
+
+    function isValidSettings(data) {
+      return (!('tagline' in data) || (data.tagline is string && data.tagline.size() < 1000)) &&
+             (!('prompt' in data) || (data.prompt is string && data.prompt.size() < 20000));
+    }
+
+    function isValidTheme(data) {
+      return (!('primaryColor' in data) || (data.primaryColor is string)) &&
+             (!('backgroundColor' in data) || (data.backgroundColor is string)) &&
+             (!('headerColor' in data) || (data.headerColor is string)) &&
+             (!('headerTextColor' in data) || (data.headerTextColor is string)) &&
+             (!('footerColor' in data) || (data.footerColor is string)) &&
+             (!('userBubbleColor' in data) || (data.userBubbleColor is string)) &&
+             (!('aiBubbleColor' in data) || (data.aiBubbleColor is string)) &&
+             (!('bubbleTextColor' in data) || (data.bubbleTextColor is string));
+    }
+
+    function isValidDeveloper(data) {
+      return (!('bio' in data) || (data.bio is string && data.bio.size() < 10000));
+    }
+
+    // --- Rules ---
+
+    match /developer/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidDeveloper(incoming()) && (docId == 'main') && (incoming().get('updatedAt', request.time) == request.time);
+    }
+
+    match /support/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSupport(incoming()) && (docId == 'main') && (incoming().get('updatedAt', request.time) == request.time);
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() && 
+                    ((docId in ['main', 'ai_instructions'] && isValidSettings(incoming())) || 
+                     (docId == 'theme' && isValidTheme(incoming()))) && 
+                    (incoming().get('updatedAt', request.time) == request.time);
+    }
+
+    match /about/{docId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidAbout(incoming()) && (docId == 'main') && (incoming().get('updatedAt', request.time) == request.time);
+    }
+
+    match /feedbacks/{feedbackId} {
+      allow read: if isAdmin();
+      allow create: if isNotBlocked() && incoming().keys().hasAll(['message', 'createdAt']) && isValidFeedback(incoming()) && incoming().createdAt == request.time;
+      allow update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && 
+                      incoming().keys().hasAll(['name', 'email', 'photo', 'role', 'createdAt']) &&
+                      isValidUser(incoming()) && 
+                      (incoming().role == 'user' || isAdmin()) && 
+                      incoming().createdAt == request.time;
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
+        (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'photo']) && isOwner(userId)) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /chats/{chatId} {
+      allow get: if isOwner(existing().userId) || isAdmin();
+      allow list: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && 
+                      incoming().keys().hasAll(['userId', 'updatedAt', 'lastMessage']) &&
+                      isValidChat(incoming()) && 
+                      incoming().updatedAt == request.time;
+      allow update: if (isOwner(existing().userId) || isAdmin()) && isValidChat(incoming()) && (incoming().get('updatedAt', request.time) == request.time);
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && (
+          isAdmin() ||
+          get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid
+        );
+        allow create: if isSignedIn() && (
+          (get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid && incoming().userId == request.auth.uid) ||
+          isAdmin()
+        ) && 
+        incoming().keys().hasAll(['chatId', 'userId', 'sender', 'text', 'timestamp', 'type']) &&
+        isValidMessage(incoming()) && 
+        incoming().timestamp == request.time;
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /ads/{adId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        (resource.data.get('active', false) == true && 
+         'allowedRoles' in resource.data && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') in resource.data.allowedRoles)
+      );
+      allow create: if isAdmin() && 
+                      incoming().keys().hasAll(['image', 'link', 'title', 'active', 'allowedRoles', 'createdAt']) &&
+                      isValidAd(incoming());
+      allow update: if isAdmin() && isValidAd(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /userMemory/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if (isOwner(userId) || isAdmin());
+    }
+
+    // Admin collection for extra security
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only manageable via console or higher privileges
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

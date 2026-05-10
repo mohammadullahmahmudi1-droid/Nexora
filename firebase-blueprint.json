@@ -1,0 +1,154 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photo": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "Chat session information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Individual chat message",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "userId": { "type": "string" },
+        "sender": { "type": "string", "enum": ["user", "AI", "admin"] },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["chat", "ad", "system"] },
+        "adRef": { "type": "string", "description": "Reference to an ad if type is ad" }
+      },
+      "required": ["chatId", "userId", "sender", "text", "timestamp", "type"]
+    },
+    "Ad": {
+      "title": "Ad",
+      "description": "Advertisement data",
+      "type": "object",
+      "properties": {
+        "image": { "type": "string" },
+        "link": { "type": "string" },
+        "title": { "type": "string" },
+        "active": { "type": "boolean" },
+        "allowedRoles": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["image", "link", "title", "active", "allowedRoles", "createdAt"]
+    },
+    "UserMemory": {
+      "title": "UserMemory",
+      "description": "AI memory about the user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "goals": { "type": "string" },
+        "interest": { "type": "string" },
+        "summary": { "type": "string" }
+      },
+      "required": ["userId"]
+    },
+    "About": {
+      "title": "About",
+      "description": "About page content",
+      "type": "object",
+      "properties": {
+        "mission": { "type": "string" },
+        "features": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["mission", "features", "updatedAt"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "User feedback submission",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["message", "createdAt"]
+    },
+    "SupportConfig": {
+      "title": "SupportConfig",
+      "description": "Support contact links configuration",
+      "type": "object",
+      "properties": {
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "facebook": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["whatsapp", "email", "facebook", "updatedAt"]
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "General application settings",
+      "type": "object",
+      "properties": {
+        "tagline": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tagline", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Chat sessions"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a chat"
+    },
+    "/ads/{adId}": {
+      "schema": "Ad",
+      "description": "Advertisements"
+    },
+    "/userMemory/{userId}": {
+      "schema": "UserMemory",
+      "description": "AI memory storage for users"
+    },
+    "/about/{docId}": {
+      "schema": "About",
+      "description": "About page content configuration"
+    },
+    "/feedbacks/{feedbackId}": {
+      "schema": "Feedback",
+      "description": "User feedback submissions"
+    },
+    "/support/{docId}": {
+      "schema": "SupportConfig",
+      "description": "Support contact links"
+    },
+    "/settings/{docId}": {
+      "schema": "AppSettings",
+      "description": "General application settings"
+    }
+  }
+}
